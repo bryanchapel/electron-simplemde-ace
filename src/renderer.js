@@ -1,18 +1,16 @@
-const SimpleMDE = require('simplemde');
-require('./ace/src/ace.js');
-require('./ace/src/mode-markdown.js');
+const SimpleMDE = require('./simplemde.js');
+// const Ace = require('./ace/ace.js').edit('editor');
 
-// let editor = new SimpleMDE({
-//     element: document.getElementById('Editor'),
-//     autofocus: true,
-// });
+// require('./ace/theme-twilight.js');
+// require('./ace/mode-markdown.js');
 
-var editor = ace.edit("editor");
-var MarkdownMode = ace.require("./ace/mode/markdown").Mode;
+let Ace = new SimpleMDE({
+    element: document.getElementById('editor')
+});
 
-editor.setTheme("./ace/theme/twilight");
-editor.session.setMode(new MarkdownMode());
+//Ace.setTheme('ace/theme/twilight');
+//Ace.session.setMode('ace/mode/markdown');
 
-// console.log(editor);
+console.log(Ace.env.editor.selection.getCursor());
 
 // module.exports = editor;
