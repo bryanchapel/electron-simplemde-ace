@@ -141,11 +141,11 @@ function createTootlip(title, action, shortcuts) {
  * The state of CodeMirror at the given position.
  */
 function getState(cm, pos) {
-	pos = pos || cm.getCursor("start");
-	var stat = cm.getTokenAt(pos);
+	pos = pos || cm.selection.getRange().start;
+	var stat = cm.session.getTokenAt(pos.row, pos.column);
 	if(!stat.type) return {};
-
-	var types = stat.type.split(" ");
+    console.log(stat);
+	var types = stat.type.split(".");
 
 	var ret = {},
 		data, text;
@@ -153,24 +153,25 @@ function getState(cm, pos) {
 		data = types[i];
 		if(data === "strong") {
 			ret.bold = true;
-		} else if(data === "variable-2") {
-			text = cm.getLine(pos.line);
+		} else if(data === "list") { // TODO: What's this?
+            text = cm.session.getLine(pos.row);
+            console.log(text);
 			if(/^\s*\d+\.\s/.test(text)) {
 				ret["ordered-list"] = true;
-			} else {
+            } else { // TODO: What about task lists?
 				ret["unordered-list"] = true;
 			}
 		} else if(data === "atom") {
 			ret.quote = true;
-		} else if(data === "em") {
+		} else if(data === "emphasis") {
 			ret.italic = true;
-		} else if(data === "quote") {
+		} else if(data === "blockquote") {
 			ret.quote = true;
 		} else if(data === "strikethrough") {
 			ret.strikethrough = true;
 		} else if(data === "comment") {
 			ret.code = true;
-		} else if(data === "link") {
+		} else if(data === "underline") { // links?
 			ret.link = true;
 		} else if(data === "tag") {
 			ret.image = true;
@@ -941,8 +942,12 @@ function _toggleLine(cm, name) {
 	cm.focus();
 }
 
+ /*
+ * Toggle italics, bold, and strikethrough
+ */
 function _toggleBlock(editor, type, start_chars, end_chars) {
-	if (/editor-preview-active/.test(editor.renderer.getContainerElement().lastChild.className)) return;
+    console.log(editor);
+	if (/editor-preview-active/.test(editor.codemirror.renderer.getContainerElement().lastChild.className)) return;
 
 	end_chars = (typeof end_chars === "undefined") ? start_chars : end_chars;
 	var cm = editor.codemirror;
@@ -952,13 +957,15 @@ function _toggleBlock(editor, type, start_chars, end_chars) {
 	var start = start_chars;
 	var end = end_chars;
 
-	var startPoint = cm.getCursor("start");
-	var endPoint = cm.getCursor("end");
+	var startPoint = cm.selection.getRange().start;
+    var endPoint = cm.selection.getRange().end;
 
 	if(stat[type]) {
-		text = cm.getLine(startPoint.line);
-		start = text.slice(0, startPoint.ch);
-		end = text.slice(startPoint.ch);
+		text = cm.session.getLine(startPoint.row);
+		start = text.slice(0, startPoint.column);
+        end = text.slice(startPoint.column);
+        console.log(start);
+        console.log(end);
 		if(type == "bold") {
 			start = start.replace(/(\*\*|__)(?![\s\S]*(\*\*|__))/, "");
 			end = end.replace(/(\*\*|__)/, "");
@@ -969,27 +976,34 @@ function _toggleBlock(editor, type, start_chars, end_chars) {
 			start = start.replace(/(\*\*|~~)(?![\s\S]*(\*\*|~~))/, "");
 			end = end.replace(/(\*\*|~~)/, "");
 		}
-		cm.replaceRange(start + end, {
-			line: startPoint.line,
-			ch: 0
-		}, {
-			line: startPoint.line,
-			ch: 99999999999999
-		});
+		cm.session.replace(
+            {
+                start: {
+                    row: startPoint.row,
+                    column: 0
+                },
+                end: {
+                    row: startPoint.row,
+                    column: 99999999999999
+                }
+            },
+            start + end
+        );
 
 		if(type == "bold" || type == "strikethrough") {
-			startPoint.ch -= 2;
+			startPoint.column -= 2;
 			if(startPoint !== endPoint) {
-				endPoint.ch -= 2;
+				endPoint.column -= 2;
 			}
 		} else if(type == "italic") {
-			startPoint.ch -= 1;
+			startPoint.column -= 1;
 			if(startPoint !== endPoint) {
-				endPoint.ch -= 1;
+				endPoint.column -= 1;
 			}
 		}
 	} else {
-		text = cm.getSelection();
+        console.log(cm.getCopyText());
+		text = cm.getCopyText();
 		if(type == "bold") {
 			text = text.split("**").join("");
 			text = text.split("__").join("");
@@ -999,14 +1013,26 @@ function _toggleBlock(editor, type, start_chars, end_chars) {
 		} else if(type == "strikethrough") {
 			text = text.split("~~").join("");
 		}
-		cm.replaceSelection(start + text + end);
+		cm.session.replace(
+            {
+                start: {
+                    row: startPoint.row,
+                    column: 0
+                },
+                end: {
+                    row: startPoint.row,
+                    column: 99999999999999
+                }
+            },
+            start + text + end
+        );
 
-		startPoint.ch += start_chars.length;
-		endPoint.ch = startPoint.ch + text.length;
+		startPoint.column += start_chars.length;
+		endPoint.column = startPoint.column + text.length;
 	}
 
-	cm.setSelection(startPoint, endPoint);
-	cm.focus();
+	//cm.setSelection(startPoint, endPoint);
+	//cm.focus();
 }
 
 function _cleanBlock(cm) {
@@ -2002,7 +2028,8 @@ SimpleMDE.prototype.isFullscreenActive = function() {
 
 SimpleMDE.prototype.getState = function() {
 	var cm = this.codemirror;
-
+    console.log('getState');
+    console.log(cm);
 	return getState(cm);
 };
 
