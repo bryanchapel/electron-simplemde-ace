@@ -11,6 +11,6 @@ let Ace = new SimpleMDE({
 //Ace.setTheme('ace/theme/twilight');
 //Ace.session.setMode('ace/mode/markdown');
 
-console.log(Ace.env.editor.selection.getCursor());
+// console.log(Ace.env.editor.selection.getCursor());
 
 // module.exports = editor;
