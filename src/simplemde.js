@@ -141,14 +141,20 @@ function createTootlip(title, action, shortcuts) {
  * The state of CodeMirror at the given position.
  */
 function getState(cm, pos) {
-	pos = pos || cm.selection.getRange().start;
-	var stat = cm.session.getTokenAt(pos.row, pos.column);
-	if(!stat.type) return {};
+    console.log(cm.selection.getRange().start);
+    pos = pos || cm.selection.getRange().start;
+    console.log(cm.session.getTokenAt);
+    var stat = cm.session.getTokenAt(pos.row, pos.column);
+    console.log('cm.session.getTokenAt ' + cm.session.getTokenAt(pos.row, pos.column));
+    console.log(cm.session.getTokenAt(pos.row, pos.column));
+	if(stat === null || !stat['type']) return {};
+    console.log('getstate stat ' + stat);
     console.log(stat);
 	var types = stat.type.split(".");
 
 	var ret = {},
-		data, text;
+        data,
+        text;
 	for(var i = 0; i < types.length; i++) {
 		data = types[i];
 		if(data === "strong") {
@@ -948,61 +954,79 @@ function _toggleLine(cm, name) {
 function _toggleBlock(editor, type, start_chars, end_chars) {
     console.log(editor);
 	if (/editor-preview-active/.test(editor.codemirror.renderer.getContainerElement().lastChild.className)) return;
-
+    console.log(typeof end_chars);
+    console.log(start_chars);
 	end_chars = (typeof end_chars === "undefined") ? start_chars : end_chars;
 	var cm = editor.codemirror;
 	var stat = getState(cm);
 
 	var text;
 	var start = start_chars;
-	var end = end_chars;
+    var end = end_chars;
 
-	var startPoint = cm.selection.getRange().start;
-    var endPoint = cm.selection.getRange().end;
+    var totalSelectionRange = cm.selection.getRange();
+	var startPoint = totalSelectionRange.start;
+    var endPoint = totalSelectionRange.end;
 
-	if(stat[type]) {
-		text = cm.session.getLine(startPoint.row);
+	if(stat.hasOwnProperty(type)) {
+        text = cm.session.getLine(startPoint.row);
 		start = text.slice(0, startPoint.column);
-        end = text.slice(startPoint.column);
-        console.log(start);
-        console.log(end);
+        end = text.slice(endPoint.column);
+        console.log('if');
+        console.log('++++++++++++++');
+        // console.log('start');
+        // console.log(start);
+        console.log('text');
+        console.log(text);
+        // console.log('end');
+        // console.log(end);
+        console.log('++++++++++++++');
+        console.log('type');
+        console.log(type);
+
 		if(type == "bold") {
-			start = start.replace(/(\*\*|__)(?![\s\S]*(\*\*|__))/, "");
-			end = end.replace(/(\*\*|__)/, "");
+            text = text.replace(/^(\*\*|__)|(\*\*|__)$/g, '');
 		} else if(type == "italic") {
-			start = start.replace(/(\*|_)(?![\s\S]*(\*|_))/, "");
-			end = end.replace(/(\*|_)/, "");
+            text = text.replace(/^(\*|_)|(\*|_)$/g, '');
 		} else if(type == "strikethrough") {
-			start = start.replace(/(\*\*|~~)(?![\s\S]*(\*\*|~~))/, "");
-			end = end.replace(/(\*\*|~~)/, "");
-		}
+            text = text.replace(/^(\*\*|~~)|(\*\*|~~)$/g, '');
+        }
+        console.log('_____________');
+        // console.log('start');
+        // console.log(start);
+        console.log('text');
+        console.log(text);
+        // console.log('end');
+        // console.log(end);
+        console.log('_____________');
 		cm.session.replace(
             {
                 start: {
                     row: startPoint.row,
-                    column: 0
+                    column: startPoint.column
                 },
                 end: {
-                    row: startPoint.row,
-                    column: 99999999999999
+                    row: endPoint.row,
+                    column: endPoint.column
                 }
             },
-            start + end
+            text
         );
 
-		if(type == "bold" || type == "strikethrough") {
-			startPoint.column -= 2;
-			if(startPoint !== endPoint) {
-				endPoint.column -= 2;
-			}
-		} else if(type == "italic") {
-			startPoint.column -= 1;
-			if(startPoint !== endPoint) {
-				endPoint.column -= 1;
-			}
-		}
+		// if(type == "bold" || type == "strikethrough") {
+		// 	startPoint.column -= 2;
+		// 	if(startPoint !== endPoint) {
+		// 		endPoint.column -= 2;
+		// 	}
+		// } else if(type == "italic") {
+		// 	startPoint.column -= 1;
+		// 	if(startPoint !== endPoint) {
+		// 		endPoint.column -= 1;
+		// 	}
+		// }
 	} else {
-        console.log(cm.getCopyText());
+        console.log('else');
+        console.log('cm.getCopyText() ' + cm.getCopyText());
 		text = cm.getCopyText();
 		if(type == "bold") {
 			text = text.split("**").join("");
@@ -1012,16 +1036,17 @@ function _toggleBlock(editor, type, start_chars, end_chars) {
 			text = text.split("_").join("");
 		} else if(type == "strikethrough") {
 			text = text.split("~~").join("");
-		}
+        }
+
 		cm.session.replace(
             {
                 start: {
                     row: startPoint.row,
-                    column: 0
+                    column: startPoint.column
                 },
                 end: {
-                    row: startPoint.row,
-                    column: 99999999999999
+                    row: endPoint.row,
+                    column: endPoint.column
                 }
             },
             start + text + end
@@ -1031,7 +1056,7 @@ function _toggleBlock(editor, type, start_chars, end_chars) {
 		endPoint.column = startPoint.column + text.length;
 	}
 
-	//cm.setSelection(startPoint, endPoint);
+	cm.selection.setSelectionRange(totalSelectionRange);
 	//cm.focus();
 }
 
@@ -1519,7 +1544,9 @@ SimpleMDE.prototype.render = function(el) {
 	// this.ace = Ace.edit('editor');
 	this.codemirror = CodeMirror.edit('editor');
 	this.codemirror.setTheme('ace/theme/twilight');
-	this.codemirror.session.setMode('ace/mode/markdown');
+    this.codemirror.session.setMode('ace/mode/markdown');
+    this.codemirror.session.setUseWrapMode(true);
+
 	// this.ace.setTheme('ace/theme/twilight');
 	// this.ace.session.setMode('ace/mode/markdown');
 	if(options.forceSync === true) {
