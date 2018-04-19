@@ -144,20 +144,21 @@ function getState(cm, pos) {
     console.log(cm.selection.getRange().start);
     pos = pos || cm.selection.getRange().start;
     console.log(cm.session.getTokenAt);
-    var stat = cm.session.getTokenAt(pos.row, pos.column);
+    var state = cm.session.getTokenAt(pos.row, pos.column);
     console.log('cm.session.getTokenAt ' + cm.session.getTokenAt(pos.row, pos.column));
     console.log(cm.session.getTokenAt(pos.row, pos.column));
-	if(stat === null || !stat['type']) return {};
-    console.log('getstate stat ' + stat);
-    console.log(stat);
-	var types = stat.type.split(".");
+	if(state === null || !state['type']) return {};
+    console.log('getstate stat ' + state);
+    console.log(state);
+	var types = state.type.split(".");
 
 	var ret = {},
         data,
         text;
+
 	for(var i = 0; i < types.length; i++) {
 		data = types[i];
-		if(data === "strong") {
+		if(data === "strong" || (data === "emphasis" && /(.+)?(\*\*|__)(.+)?(\*\*|__)(.+)?/.test(state.value))) {
 			ret.bold = true;
 		} else if(data === "list") { // TODO: What's this?
             text = cm.session.getLine(pos.row);
@@ -181,8 +182,8 @@ function getState(cm, pos) {
 			ret.link = true;
 		} else if(data === "tag") {
 			ret.image = true;
-		} else if(data.match(/^header(\-[1-6])?$/)) {
-			ret[data.replace("header", "heading")] = true;
+		} else if(data === "heading") {
+			ret.heading = true;
 		}
 	}
 	return ret;
@@ -952,82 +953,61 @@ function _toggleLine(cm, name) {
  * Toggle italics, bold, and strikethrough
  */
 function _toggleBlock(editor, type, start_chars, end_chars) {
-    console.log(editor);
+
 	if (/editor-preview-active/.test(editor.codemirror.renderer.getContainerElement().lastChild.className)) return;
-    console.log(typeof end_chars);
-    console.log(start_chars);
-	end_chars = (typeof end_chars === "undefined") ? start_chars : end_chars;
-	var cm = editor.codemirror;
-	var stat = getState(cm);
 
-	var text;
-	var start = start_chars;
-    var end = end_chars;
+    end_chars = (typeof end_chars === "undefined") ? start_chars : end_chars;
 
-    var totalSelectionRange = cm.selection.getRange();
-	var startPoint = totalSelectionRange.start;
-    var endPoint = totalSelectionRange.end;
+    let cm = editor.codemirror,
+        stat = getState(cm),
+        text,
+	    start = start_chars,
+        end = end_chars,
+        totalSelectionRange = cm.selection.getRange(),
+	    startPoint = totalSelectionRange.start,
+        endPoint = totalSelectionRange.end;
 
 	if(stat.hasOwnProperty(type)) {
         text = cm.session.getLine(startPoint.row);
 		start = text.slice(0, startPoint.column);
         end = text.slice(endPoint.column);
-        console.log('if');
-        console.log('++++++++++++++');
-        // console.log('start');
-        // console.log(start);
-        console.log('text');
-        console.log(text);
-        // console.log('end');
-        // console.log(end);
-        console.log('++++++++++++++');
-        console.log('type');
-        console.log(type);
 
 		if(type == "bold") {
-            text = text.replace(/^(\*\*|__)|(\*\*|__)$/g, '');
+            text = text.replace(/(\*\*|__)|(\*\*|__)/g, '');
 		} else if(type == "italic") {
-            text = text.replace(/^(\*|_)|(\*|_)$/g, '');
+            text = text.replace(/(\*|_)|(\*|_)/g, '');
 		} else if(type == "strikethrough") {
-            text = text.replace(/^(\*\*|~~)|(\*\*|~~)$/g, '');
+            text = text.replace(/(\*\*|~~)|(\*\*|~~)/g, '');
         }
-        console.log('_____________');
-        // console.log('start');
-        // console.log(start);
-        console.log('text');
-        console.log(text);
-        // console.log('end');
-        // console.log(end);
-        console.log('_____________');
+
 		cm.session.replace(
             {
                 start: {
                     row: startPoint.row,
-                    column: startPoint.column
+                    column: 0
                 },
                 end: {
                     row: endPoint.row,
-                    column: endPoint.column
+                    column: 99999999999999
                 }
             },
             text
         );
 
-		// if(type == "bold" || type == "strikethrough") {
-		// 	startPoint.column -= 2;
-		// 	if(startPoint !== endPoint) {
-		// 		endPoint.column -= 2;
-		// 	}
-		// } else if(type == "italic") {
-		// 	startPoint.column -= 1;
-		// 	if(startPoint !== endPoint) {
-		// 		endPoint.column -= 1;
-		// 	}
-		// }
+		if(type == "bold" || type == "strikethrough") {
+			startPoint.column -= 2;
+			if(startPoint !== endPoint) {
+				endPoint.column -= 2;
+			}
+		} else if(type == "italic") {
+			startPoint.column -= 1;
+			if(startPoint !== endPoint) {
+				endPoint.column -= 1;
+			}
+		}
 	} else {
-        console.log('else');
-        console.log('cm.getCopyText() ' + cm.getCopyText());
-		text = cm.getCopyText();
+        text = cm.getCopyText();
+
 		if(type == "bold") {
 			text = text.split("**").join("");
 			text = text.split("__").join("");
@@ -1057,7 +1037,7 @@ function _toggleBlock(editor, type, start_chars, end_chars) {
 	}
 
 	cm.selection.setSelectionRange(totalSelectionRange);
-	//cm.focus();
+	cm.focus();
 }
 
 function _cleanBlock(cm) {
