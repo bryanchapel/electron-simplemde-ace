@@ -157,7 +157,9 @@ function getState(cm, pos) {
         text;
 
 	for(var i = 0; i < types.length; i++) {
-		data = types[i];
+        data = types[i];
+        // TODO: the second or condition below accounts for ace editor incorrectly marking strong strings as emphasis if a space is next to the asterisks
+        // Need to fix the regex for the tokenizer in markdown mode to actually fix this.
 		if(data === "strong" || (data === "emphasis" && /(.+)?(\*\*|__)(.+)?(\*\*|__)(.+)?/.test(state.value))) {
 			ret.bold = true;
 		} else if(data === "list") { // TODO: What's this?
@@ -801,8 +803,7 @@ function togglePreview(editor) {
 }
 
 function _replaceSelection(cm, active, startEnd, url) {
-	if(/editor-preview-active/.test(cm.renderer.getContainerElement().lastChild.className))
-		return;
+	if(/editor-preview-active/.test(cm.renderer.getContainerElement().lastChild.className)) return;
 
 	var text;
 	var start = startEnd[0];
@@ -913,37 +914,49 @@ function _toggleHeading(cm, direction, size) {
 
 
 function _toggleLine(cm, name) {
-	if(/editor-preview-active/.test(cm.renderer.getContainerElement().lastChild.className))
-		return;
+	if(/editor-preview-active/.test(cm.renderer.getContainerElement().lastChild.className)) return;
 
-	var stat = getState(cm);
-	var startPoint = cm.getCursor("start");
-	var endPoint = cm.getCursor("end");
-	var repl = {
+	let state = getState(cm),
+	    startPoint = cm.selection.getRange().start,
+	    endPoint = cm.selection.getRange().end,
+	    repl = {
 		"quote": /^(\s*)\>\s+/,
 		"unordered-list": /^(\s*)(\*|\-|\+)\s+/,
 		"ordered-list": /^(\s*)\d+\.\s+/
-	};
-	var map = {
+	},
+	    map = {
 		"quote": "> ",
 		"unordered-list": "* ",
 		"ordered-list": "1. "
 	};
-	for(var i = startPoint.line; i <= endPoint.line; i++) {
+	for(let i = startPoint.line; i <= endPoint.line; i++) {
 		(function(i) {
-			var text = cm.getLine(i);
-			if(stat[name]) {
+			let text = cm.session.getLine(i);
+			if(state[name]) {
 				text = text.replace(repl[name], "$1");
 			} else {
 				text = map[name] + text;
-			}
-			cm.replaceRange(text, {
-				line: i,
-				ch: 0
-			}, {
-				line: i,
-				ch: 99999999999999
-			});
+            }
+            cm.session.replace(
+                {
+                    start: {
+                        row: i,
+                        column: 0
+                    },
+                    end: {
+                        row: i,
+                        column: 99999999999999
+                    }
+                },
+                text
+            ); // TODO: Left off here
+			// cm.replaceRange(text, {
+			// 	line: i,
+			// 	ch: 0
+			// }, {
+			// 	line: i,
+			// 	ch: 99999999999999
+			// });
 		})(i);
 	}
 	cm.focus();
@@ -953,7 +966,6 @@ function _toggleLine(cm, name) {
  * Toggle italics, bold, and strikethrough
  */
 function _toggleBlock(editor, type, start_chars, end_chars) {
-
 	if (/editor-preview-active/.test(editor.codemirror.renderer.getContainerElement().lastChild.className)) return;
 
     end_chars = (typeof end_chars === "undefined") ? start_chars : end_chars;
